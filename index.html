@@ -1498,6 +1498,25 @@ async function shareImage(){
     const canvas = buildShareCanvas();
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if(!blob) throw new Error('canvas toBlob failed');
+    const filename = `letternook-${state.puzzleNum}.png`;
+
+    // Tier 1: native OS share sheet (best on mobile -- straight into Messages/Instagram/etc,
+    // no download and no clipboard step needed at all)
+    if(navigator.share && navigator.canShare){
+      try{
+        const file = new File([blob], filename, { type: 'image/png' });
+        if(navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file], title: 'LETTERNOOK', text: `LETTERNOOK #${state.puzzleNum}` });
+          setShareImageFeedback('Shared!');
+          return;
+        }
+      } catch(e){
+        if(e && e.name === 'AbortError') return; // user backed out of the share sheet -- don't also copy/download
+        // otherwise fall through to the next tier
+      }
+    }
+
+    // Tier 2: clipboard image copy (best on desktop -- pastes like a photo)
     if(navigator.clipboard && typeof window.ClipboardItem === 'function'){
       try{
         await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
@@ -1505,7 +1524,9 @@ async function shareImage(){
         return;
       } catch(e){ /* fall through to download */ }
     }
-    downloadBlob(blob, `letternook-${state.puzzleNum}.png`);
+
+    // Tier 3: plain download, last resort
+    downloadBlob(blob, filename);
     setShareImageFeedback('Image downloaded!');
   } catch(e){
     setShareImageFeedback('Could not create image.');
