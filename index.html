@@ -605,7 +605,7 @@ function msToClock(ms){
 // server-side into the Worker. This client no longer contains the logic needed
 // to compute future daily answers -- only today's puzzle, fetched from the API,
 // is ever known here.
-const PUZZLE_API_URL = 'https://api.YOURDOMAIN.com/puzzle'; // <-- set this after deploying the Worker
+const PUZZLE_API_URL = 'https://letternook-api.randall-jeremy.workers.dev/puzzle'; // <-- set this after deploying the Worker
 
 async function fetchDailyPuzzle(){
   const res = await fetch(PUZZLE_API_URL, { cache: 'no-store' });
