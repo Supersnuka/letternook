@@ -330,6 +330,75 @@
     letter-spacing:3px;
     font-weight:600;
   }
+  .onboard-modal{
+    max-width:340px;
+    width:100%;
+  }
+  .demo-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 44px);
+    grid-template-rows:repeat(3, 44px);
+    gap:8px;
+    justify-content:center;
+    margin:14px 0;
+  }
+  .demo-tile{
+    position:relative;
+    background:var(--tile);
+    border:1px solid var(--tile-border);
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Inter',sans-serif;
+    font-weight:800;
+    font-size:16px;
+    color:var(--text);
+  }
+  .demo-tile.path{
+    border-color:var(--gold);
+    box-shadow:0 0 0 2px rgba(216,169,75,0.3);
+  }
+  .demo-tile.path::after{
+    content:attr(data-order);
+    position:absolute;
+    top:-6px; right:-6px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--gold);
+    color:#1b1a2a;
+    font-size:9px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .demo-feedback{
+    display:flex;
+    gap:6px;
+    justify-content:center;
+    margin:10px 0;
+  }
+  .demo-feedback .hbox{
+    width:38px; height:38px;
+    font-size:16px;
+  }
+  .demo-legend{
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    flex-wrap:wrap;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+  .demo-legend .swatch{
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:2px;
+    margin-right:4px;
+    vertical-align:middle;
+  }
   .statsmodal{
     max-width:340px;
     width:100%;
@@ -506,6 +575,39 @@
   <div class="history" id="history"></div>
 </div>
 
+<div class="overlay" id="onboardOverlay">
+  <div class="modal onboard-modal">
+    <h2>Welcome to LETTERNOOK</h2>
+    <p>Tap connected letters — up, down, sideways, or diagonal — to trace out a word.</p>
+    <div class="demo-grid">
+      <div class="demo-tile path" data-order="1">P</div>
+      <div class="demo-tile path" data-order="2">L</div>
+      <div class="demo-tile">K</div>
+      <div class="demo-tile path" data-order="3">A</div>
+      <div class="demo-tile path" data-order="4">N</div>
+      <div class="demo-tile path" data-order="5">T</div>
+      <div class="demo-tile">Y</div>
+      <div class="demo-tile">Z</div>
+      <div class="demo-tile">W</div>
+    </div>
+    <p>Submit your guess and get instant feedback on how close it is:</p>
+    <div class="demo-feedback">
+      <div class="hbox green">P</div>
+      <div class="hbox yellow">L</div>
+      <div class="hbox red">A</div>
+      <div class="hbox green">N</div>
+      <div class="hbox yellow">T</div>
+    </div>
+    <div class="demo-legend">
+      <span><span class="swatch" style="background:var(--green)"></span>right spot</span>
+      <span><span class="swatch" style="background:var(--yellow)"></span>wrong spot</span>
+      <span><span class="swatch" style="background:var(--red)"></span>not in word</span>
+    </div>
+    <p style="margin-top:14px;">A few extra real words are hidden in every grid too — tracing any of them is worth a shot. Use hints if you're stuck, and come back daily to build your streak.</p>
+    <button class="btn primary" id="onboardDismissBtn" style="margin-top:6px;">Got it — let's play</button>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="modal statsmodal">
     <button class="closeX" id="statsCloseBtn">&times;</button>
@@ -609,7 +711,7 @@ function msToClock(ms){
 // server-side into the Worker. This client no longer contains the logic needed
 // to compute future daily answers -- only today's puzzle, fetched from the API,
 // is ever known here.
-const PUZZLE_API_URL = 'https://letternook-api.randall-jeremy.workers.dev/puzzle'; // <-- set this after deploying the Worker
+const PUZZLE_API_URL = 'letternook-api.randall-jeremy.workers.dev/puzzle'; // <-- set this after deploying the Worker
 
 async function fetchDailyPuzzle(){
   const res = await fetch(PUZZLE_API_URL, { cache: 'no-store' });
@@ -1326,6 +1428,19 @@ document.getElementById('devResetBtn').addEventListener('click', () => {
   newGame('daily');
 });
 window.addEventListener('resize', updateThread);
+
+function checkFirstVisit(){
+  try{
+    if(!localStorage.getItem('letternook_onboarded')){
+      document.getElementById('onboardOverlay').classList.add('show');
+    }
+  } catch(e){ /* localStorage unavailable */ }
+}
+document.getElementById('onboardDismissBtn').addEventListener('click', () => {
+  try{ localStorage.setItem('letternook_onboarded', '1'); } catch(e){}
+  document.getElementById('onboardOverlay').classList.remove('show');
+});
+checkFirstVisit();
 
 (function handleResetParam(){
   try{
