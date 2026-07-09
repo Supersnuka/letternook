@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>LETTERNOOK</title>
+<meta name="description" content="Trace connected letters to find the hidden word. A new daily word-tracing puzzle.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://letternook.ca">
+<meta property="og:title" content="LETTERNOOK — a daily word-tracing puzzle">
+<meta property="og:description" content="Trace connected letters to find the hidden word. A new puzzle every day.">
+<meta property="og:image" content="https://letternook.ca/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="LETTERNOOK — a daily word-tracing puzzle">
+<meta name="twitter:description" content="Trace connected letters to find the hidden word. A new puzzle every day.">
+<meta name="twitter:image" content="https://letternook.ca/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@500;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -635,6 +647,9 @@
 
     <div class="modal-actions">
       <button class="btn" id="shareBtn">Share Result</button>
+      <button class="btn" id="shareImageBtn">Share Image</button>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
       <button class="btn primary" id="playAgainBtn">Practice Round</button>
     </div>
     <div id="devResetWrap" style="margin-top:10px;">
@@ -1329,6 +1344,174 @@ function setShareFeedback(msg){
   setTimeout(() => { btn.textContent = original; }, 1800);
 }
 
+function roundRectPath(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function drawRoundedFillRect(ctx, x, y, w, h, r, color){
+  ctx.fillStyle = color;
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.fill();
+}
+function drawShareIcon(ctx, x, y, size){
+  const s = size / 24;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = '#d8a94b';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  roundRectPath(ctx, 9, 8, 8, 8, 1.5);
+  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(3,18); ctx.lineTo(21,18); ctx.stroke();
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath(); ctx.moveTo(6,18); ctx.lineTo(6,14); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(18,18); ctx.lineTo(18,14); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function drawStatBox(ctx, x, y, w, h, value, label){
+  ctx.fillStyle = 'rgba(216,169,75,0.1)';
+  roundRectPath(ctx, x, y, w, h, 10);
+  ctx.fill();
+  ctx.fillStyle = '#e8c97a';
+  ctx.font = 'bold 34px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(value, x + w/2, y + h/2 + 12);
+  ctx.fillStyle = '#9791b8';
+  ctx.font = '13px Arial, sans-serif';
+  ctx.fillText(label, x + w/2, y + h/2 + 34);
+  ctx.textAlign = 'left';
+}
+
+function buildShareCanvas(){
+  const PAD = 48;
+  const W = 640;
+  const wordLen = state.secret.length;
+  const rows = Math.max(state.history.length, 1);
+  const SQ = 52, GAP = 10;
+  const rowWidth = wordLen*SQ + (wordLen-1)*GAP;
+  const headerH = 108;
+  const statsBoxH = 110;
+  const statsGapAfter = 32;
+  const gridH = rows*SQ + (rows-1)*GAP;
+  const afterGridGap = 24;
+  const statsLineH = 26;
+  const footerGap = 24;
+  const footerH = 30;
+  const topPad = 48;
+  const H = topPad + headerH + statsBoxH + statsGapAfter + gridH + afterGridGap + statsLineH + footerGap + footerH + 40;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = Math.round(H);
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#1b1a2a';
+  ctx.fillRect(0, 0, W, H);
+
+  let y = topPad;
+  drawShareIcon(ctx, PAD, y, 40);
+  ctx.fillStyle = '#f2eee4';
+  ctx.font = 'bold 26px Arial, sans-serif';
+  ctx.fillText('LETTERNOOK', PAD+52, y+28);
+  ctx.fillStyle = '#9791b8';
+  ctx.font = '16px Arial, sans-serif';
+  ctx.fillText(`Puzzle #${state.puzzleNum}`, PAD+52, y+52);
+
+  y += headerH;
+
+  const boxW = (W - PAD*2 - 20) / 2;
+  const pts = pointsEarnedThisGame();
+  const stats = loadStats();
+  drawStatBox(ctx, PAD, y, boxW, statsBoxH, state.won ? `+${pts}` : '+0', 'Points');
+  drawStatBox(ctx, PAD+boxW+20, y, boxW, statsBoxH, String(stats.currentStreak), 'Streak');
+
+  y += statsBoxH + statsGapAfter;
+
+  state.history.forEach((g, i) => {
+    const rowY = y + i*(SQ+GAP);
+    const startX = W/2 - rowWidth/2;
+    g.colors.forEach((c, j) => {
+      const color = c === 'green' ? '#9fd8ae' : c === 'yellow' ? '#ecd98c' : '#e3a49c';
+      drawRoundedFillRect(ctx, startX + j*(SQ+GAP), rowY, SQ, SQ, 8, color);
+    });
+  });
+
+  y += gridH + afterGridGap;
+
+  const hu = hintsUsedThisGame();
+  const hintNote = hu === 0 ? 'no hints' : hu === 1 ? '1 hint' : `${hu} hints`;
+  const timeNote = typeof state.elapsedMs === 'number' ? ` \u00b7 ${msToClock(state.elapsedMs)}` : '';
+  const line = state.won
+    ? `Solved ${state.history.length}/${MAX_GUESSES} \u00b7 ${hintNote}${timeNote}`
+    : `Unsolved \u00b7 ${MAX_GUESSES}/${MAX_GUESSES}${timeNote}`;
+  ctx.fillStyle = '#9791b8';
+  ctx.font = '15px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(line, W/2, y + statsLineH/2 + 5);
+  ctx.textAlign = 'left';
+
+  y += statsLineH + footerGap;
+
+  ctx.strokeStyle = 'rgba(151,145,184,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD, y);
+  ctx.lineTo(W-PAD, y);
+  ctx.stroke();
+
+  y += 20;
+  ctx.fillStyle = '#d8a94b';
+  ctx.font = '15px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('letternook.ca', W/2, y+10);
+  ctx.textAlign = 'left';
+
+  return canvas;
+}
+
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function setShareImageFeedback(msg){
+  const btn = document.getElementById('shareImageBtn');
+  const original = 'Share Image';
+  btn.textContent = msg;
+  setTimeout(() => { btn.textContent = original; }, 1800);
+}
+async function shareImage(){
+  try{
+    const canvas = buildShareCanvas();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if(!blob) throw new Error('canvas toBlob failed');
+    if(navigator.clipboard && typeof window.ClipboardItem === 'function'){
+      try{
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        setShareImageFeedback('Image copied!');
+        return;
+      } catch(e){ /* fall through to download */ }
+    }
+    downloadBlob(blob, `letternook-${state.puzzleNum}.png`);
+    setShareImageFeedback('Image downloaded!');
+  } catch(e){
+    setShareImageFeedback('Could not create image.');
+  }
+}
+
 function openStatsModal(justFinished){
   const stats = loadStats();
   const dailyOver = state.mode === 'daily' && state.over;
@@ -1393,6 +1576,7 @@ function openStatsModal(justFinished){
   }
 
   document.getElementById('shareBtn').style.display = dailyOver ? 'inline-block' : 'none';
+  document.getElementById('shareImageBtn').style.display = dailyOver ? 'inline-block' : 'none';
   document.getElementById('playAgainBtn').textContent = state.mode === 'practice' ? 'New Practice Round' : 'Practice Round';
 
   document.getElementById('overlay').classList.add('show');
@@ -1421,6 +1605,7 @@ document.getElementById('statsCloseBtn').addEventListener('click', () => {
   clearInterval(countdownInterval);
 });
 document.getElementById('shareBtn').addEventListener('click', shareResult);
+document.getElementById('shareImageBtn').addEventListener('click', shareImage);
 document.getElementById('devResetBtn').addEventListener('click', () => {
   try{ localStorage.removeItem(progressKey(getPuzzleNumber())); } catch(e){}
   document.getElementById('overlay').classList.remove('show');
