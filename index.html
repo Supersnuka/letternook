@@ -673,7 +673,7 @@ const SIZE = 6;
 const MAX_GUESSES = 6;
 const MAX_HINTS = 2;
 const LETTER_POOL = "E".repeat(12)+"A".repeat(9)+"I".repeat(9)+"O".repeat(8)+"N".repeat(7)+"R".repeat(7)+"T".repeat(7)+"L".repeat(4)+"S".repeat(6)+"U".repeat(4)+"D".repeat(4)+"G".repeat(3)+"B".repeat(2)+"C".repeat(3)+"M".repeat(3)+"P".repeat(2)+"F".repeat(2)+"H".repeat(2)+"V".repeat(2)+"W".repeat(2)+"Y".repeat(2)+"K"+"J"+"X"+"Z"+"Q";
-const LAUNCH_DATE_UTC = Date.UTC(2026, 0, 1); // matches the Worker's reference point
+const LAUNCH_DAY_INDEX = Math.floor(Date.UTC(2026, 0, 1) / 86400000); // reference point
 
 let state = {};
 let activeRng = Math.random;
@@ -698,15 +698,21 @@ function hashStr(str){
   h = Math.imul(h ^ (h >>> 13), 3266489909);
   return (h ^ (h >>> 16)) >>> 0;
 }
+// ---------- reset happens at the player's own local midnight (matches Wordle) ----------
+// The client's own Date getters already reflect its local timezone natively, so no
+// Intl/timezone-name lookups are needed here at all -- only the Worker needs an
+// explicit numeric offset, which is sent along when fetching (see fetchDailyPuzzle).
+function localOffsetMinutes(){
+  return -new Date().getTimezoneOffset(); // minutes EAST of UTC
+}
 function getPuzzleNumber(){
   const now = new Date();
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return Math.floor((todayUTC - LAUNCH_DATE_UTC) / 86400000) + 1;
+  const localDayIndex = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+  return localDayIndex - LAUNCH_DAY_INDEX + 1;
 }
-function nextMidnightUTC(){
+function nextLocalMidnight(){
   const now = new Date();
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return new Date(todayUTC + 86400000);
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 0);
 }
 function msToClock(ms){
   if(typeof ms !== 'number' || ms < 0) return '--:--';
@@ -720,10 +726,11 @@ function msToClock(ms){
 // server-side into the Worker. This client no longer contains the logic needed
 // to compute future daily answers -- only today's puzzle, fetched from the API,
 // is ever known here.
-const PUZZLE_API_URL = 'https://letternook-api.yourusername.workers.dev/puzzle'; // <-- set this after deploying the Worker
+const PUZZLE_API_URL = 'https://api.YOURDOMAIN.com/puzzle'; // <-- set this after deploying the Worker
 
 async function fetchDailyPuzzle(){
-  const res = await fetch(PUZZLE_API_URL, { cache: 'no-store' });
+  const url = `${PUZZLE_API_URL}?tz=${encodeURIComponent(localOffsetMinutes())}`;
+  const res = await fetch(url, { cache: 'no-store' });
   if(!res.ok) throw new Error('puzzle API returned ' + res.status);
   const data = await res.json();
   if(!data || typeof data.secret !== 'string' || !Array.isArray(data.letters)){
@@ -1273,7 +1280,7 @@ let countdownInterval = null;
 function startCountdown(){
   clearInterval(countdownInterval);
   const tick = () => {
-    const diff = nextMidnightUTC() - new Date();
+    const diff = nextLocalMidnight() - new Date();
     if(diff <= 0){ document.getElementById('countdownTime').textContent = '00:00:00'; return; }
     const h = String(Math.floor(diff/3600000)).padStart(2,'0');
     const m = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
@@ -1472,3 +1479,4 @@ newGame('daily');
 </script>
 </body>
 </html>
+
