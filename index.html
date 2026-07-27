@@ -649,9 +649,6 @@
       <button class="btn" id="shareBtn">Share Result</button>
       <button class="btn primary" id="playAgainBtn">Practice Round</button>
     </div>
-    <div id="devResetWrap" style="margin-top:10px;">
-      <button id="devResetBtn" style="background:none;border:none;color:var(--muted);font-size:10px;text-decoration:underline;cursor:pointer;font-family:'JetBrains Mono',monospace;">reset today's puzzle (testing)</button>
-    </div>
   </div>
 </div>
 
@@ -723,7 +720,7 @@ function msToClock(ms){
 // server-side into the Worker. This client no longer contains the logic needed
 // to compute future daily answers -- only today's puzzle, fetched from the API,
 // is ever known here.
-const PUZZLE_API_URL = 'https://letternook-api.randall-jeremy.workers.dev/puzzle'; // <-- set this after deploying the Worker
+const PUZZLE_API_URL = 'https://letternook-api.yourusername.workers.dev/puzzle'; // <-- set this after deploying the Worker
 
 async function fetchDailyPuzzle(){
   const res = await fetch(PUZZLE_API_URL, { cache: 'no-store' });
@@ -1437,12 +1434,6 @@ document.getElementById('statsCloseBtn').addEventListener('click', () => {
   clearInterval(countdownInterval);
 });
 document.getElementById('shareBtn').addEventListener('click', shareResult);
-document.getElementById('devResetBtn').addEventListener('click', () => {
-  try{ localStorage.removeItem(progressKey(getPuzzleNumber())); } catch(e){}
-  document.getElementById('overlay').classList.remove('show');
-  clearInterval(countdownInterval);
-  newGame('daily');
-});
 window.addEventListener('resize', updateThread);
 
 function checkFirstVisit(){
@@ -1481,4 +1472,3 @@ newGame('daily');
 </script>
 </body>
 </html>
-
